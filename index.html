@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>palace - Styled Canvas</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Caveat&family=Courier+Prime&family=Inter:wght=300;400;600&family=Playfair+Display:ital,wght=0,400;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Warm background tone inspired by premium paper look */
+        .page-bg-base {
+            background-color: #faf6ee;
+        }
+        
+        /* Ambient lighting/shadow overlay to simulate a raw structural moodboard layout */
+        .shadow-cast-base {
+            position: absolute; inset: 0; pointer-events: none; opacity: 0.15; z-index: 5;
+            background-image: url('https://raw.githubusercontent.com/username/palace-assets/main/moodboard_shadows.png');
+            background-size: cover; background-position: center;
+        }
+
+        /* Repeating background line linear-gradient texture replicating notebook paper rules */
+        .texture-ruled {
+            background-image: linear-gradient(#e8e2d5 1px, transparent 1px) !important;
+            background-size: 100% 28px !important; line-height: 28px !important;
+        }
+        
+        /* Background radial-gradient texture creating a subtle engineering dot-grid layout */
+        .texture-dots {
+            background-image: radial-gradient(#e8e2d5 1.5px, transparent 1.5px) !important;
+            background-size: 24px 24px !important;
+        }
+
+        /* Staging sidebar box styling to hold uncategorized thoughts */
+        #active-board-stager {
+            border: 2px dashed #d1c8b3;
+            background-color: rgba(211, 203, 182, 0.1);
+        }
+
+        /* Visual highlighting for sorting mode (Triage Mode) inside the Daily Dump */
+        .filter-mode .dump-item {
+            border: 2px solid #a3b899 !important; /* Muted soft green border line */
+            box-shadow: 0 4px 12px rgba(163, 184, 153, 0.2); cursor: pointer !important;
+        }
+        .filter-mode .dump-item:hover { background-color: #f1f3ef !important; }
+
+        /* Smooth UI transit animations for dragging actions and item hovering states */
+        .dump-item, .board-element {
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .dump-item:hover, .board-element:hover {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Custom ambient layout scrollbars to preserve aesthetic cleanliness across giant canvases */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.03); }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body class="bg-[#1e1e1a] text-zinc-800 font-sans antialiased h-screen flex flex-col overflow-hidden select-none">
+
+    <header class="bg-zinc-900 border-b border-zinc-800 px-6 py-3 flex items-center justify-between z-50 shrink-0 text-white flex-wrap gap-3">
+        <div class="flex items-center space-x-6">
+            <h1 class="text-xl font-bold tracking-wider font-serif text-amber-100">palace.</h1>
+            <nav class="flex space-x-1 bg-zinc-800 p-1 rounded-lg text-sm font-medium">
+                <button id="nav-dump" onclick="switchView('dump')" class="px-4 py-1.5 rounded-md bg-zinc-700 text-white shadow-xs transition">Daily Dump</button>
+                <button id="nav-boards" onclick="switchView('boards')" class="px-4 py-1.5 rounded-md text-zinc-400 hover:text-white transition">My Boards</button>
+            </nav>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <div id="filter-toggle-container" class="flex items-center space-x-3 border-r border-zinc-800 pr-4">
+                <span class="text-xs text-zinc-400 uppercase tracking-wider" id="toggle-label">Type Mode</span>
+                <button id="filter-toggle" onclick="toggleFilterMode()" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-zinc-700 transition-colors duration-200 ease-in-out">
+                    <span id="toggle-knob" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out translate-x-0"></span>
+                </button>
+            </div>
+            <button onclick="copySyncLink()" class="bg-amber-100 text-zinc-900 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs hover:bg-amber-200 transition">
+                🔗 Copy Link to Laptop
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 relative overflow-hidden p-4 bg-[#2e2d27]">
+
+        <div id="view-dump" class="absolute inset-4 rounded-xl shadow-2xl border border-amber-900/20 page-bg-base texture-ruled overflow-auto transition-opacity duration-200" onclick="closeFilterMenu()">
+            <div class="absolute top-0 left-0 right-0 h-4 shadow-cast-base sticky top-0 z-30 pointer-events-none"></div>
+            <div id="dump-instruction" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-amber-900/30 text-center p-4 z-0">
+                <p class="text-3xl font-serif italic">Daily Sandbox</p>
+                <p class="text-xs mt-2 tracking-wide">Double-click to type | Single-click and drag to clean layout spacing</p>
+            </div>
+            <div id="dump-canvas" class="absolute inset-0 min-w-[2000px] min-h-[2000px] z-10" ondblclick="handleCanvasDoubleClick(event, 'dump')"></div>
+        </div>
+
+        <div id="view-boards" class="absolute inset-0 overflow-auto hidden p-8">
+            
+            <div id="boards-dashboard">
+                <div class="flex items-center justify-between mb-8 max-w-5xl mx-auto">
+                    <h2 class="text-3xl font-serif italic text-amber-50">Creative Canvases</h2>
+                    <button onclick="createNewBoard()" class="bg-amber-100 text-zinc-900 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition">+ New Board</button>
+                </div>
+                <div id="boards-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto"></div>
+            </div>
+
+            <div id="active-board-view" class="absolute inset-0 hidden flex flex-col bg-zinc-100">
+                
+                <div class="bg-white border-b border-zinc-200 px-6 py-2.5 flex items-center justify-between z-30 shadow-xs flex-wrap gap-2">
+                    <div class="flex items-center space-x-4 max-w-[35%]">
+                        <button onclick="closeActiveBoard()" class="text-sm text-zinc-500 hover:text-zinc-900 flex items-center space-x-1 font-medium shrink-0"><span>←</span> <span>Back</span></button>
+                        <h3 id="active-board-title" class="text-base font-semibold text-zinc-900 font-serif truncate cursor-text border border-transparent hover:border-zinc-300 hover:bg-zinc-50 px-2 py-0.5 rounded transition" ondblclick="startRenameBoard(event)">Board Name</h3>
+                    </div>
+                    <div class="flex items-center space-x-2 text-xs flex-wrap">
+                        <select id="board-font-select" onchange="changeBoardFont(this.value)" class="bg-zinc-100 border-none rounded-md px-2 py-1.5 font-medium">
+                            <option value="font-sans">Clean Sans</option>
+                            <option value="font-serif">Elegant Serif</option>
+                            <option value="font-mono">Typewriter</option>
+                            <option value="'Caveat', cursive">Handwritten</option>
+                        </select>
+                        <select id="board-texture-select" onchange="changeBoardTexture(this.value)" class="bg-zinc-100 border-none rounded-md px-2 py-1.5 font-medium">
+                            <option value="none">Blank Canvas</option>
+                            <option value="texture-ruled">Notebook Pages</option>
+                            <option value="texture-dots">Grid dots</option>
+                        </select>
+                        <select id="board-bg-select" onchange="changeBoardBg(this.value)" class="bg-zinc-100 border-none rounded-md px-2 py-1.5 font-medium">
+                            <option value="#faf6ee">Warm Paper</option>
+                            <option value="#ffffff">Pure White</option>
+                            <option value="#f4f4f5">Studio Gray</option>
+                            <option value="#e3e7e2">Muted Green</option>
+                        </select>
+                        <div class="h-4 w-px bg-zinc-200 mx-1"></div>
+                        <button onclick="addMediaToBoard('image')" class="bg-zinc-900 hover:bg-zinc-800 text-white px-2.5 py-1.5 rounded-md font-medium">Add Image</button>
+                        <button onclick="addMediaToBoard('sticker')" class="bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1.5 rounded-md font-medium">Sticker</button>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex overflow-hidden">
+                    <div class="w-[280px] bg-zinc-50 border-r border-zinc-200 p-4 flex flex-col space-y-4 shrink-0">
+                        <h4 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Uncategorized Dump</h4>
+                        <div id="active-board-stager" class="flex-1 rounded-md p-2 overflow-auto text-sm space-y-2"></div>
+                    </div>
+
+                    <div id="board-sandbox-container" class="flex-1 relative overflow-auto page-bg-base transition-all duration-200">
+                        <div class="absolute top-0 left-0 right-0 h-4 shadow-cast-base opacity-25 sticky top-0 z-30 pointer-events-none"></div>
+                        <div id="board-sandbox" class="absolute inset-0 min-w-[2000px] min-h-[2000px] p-4" ondblclick="handleCanvasDoubleClick(event, 'board')"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="filter-menu" class="hidden absolute bg-white rounded-lg shadow-2xl border border-zinc-200 p-1.5 z-50 min-w-[180px] text-xs font-medium">
+        <div class="text-zinc-400 px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold">Migrate Item To:</div>
+        <div id="filter-menu-options" class="flex flex-col space-y-0.5"></div>
+    </div>
+
+    <script>
+        // Core App Memory Schema: Restores local profile state configurations safely or maps a default starter configuration template tracking structure
+        let state = JSON.parse(localStorage.getItem('palace_moodboard_state')) || {
+            dumpItems: [
+                { id: 'd1', text: 'This is a test note. Grab and move me around!', x: 100, y: 120 },
+                { id: 'd2', text: 'Double-click anywhere on empty space to write a quick thought.', x: 140, y: 240 }
+            ],
+            boards: [
+                { id: 'b1', name: 'Floral Garden Moodboard', font: 'font-serif', bg: '#faf6ee', texture: 'texture-ruled', elements: [] },
+                { id: 'b2', name: 'Layout Template Ideas', font: 'font-mono', bg: '#e3e7e2', texture: 'none', elements: [] }
+            ]
+        };
+
+        // Standard App wide utility method targeting localized configuration persistence triggers
+        function saveState() {
+            localStorage.setItem('palace_moodboard_state', JSON.stringify(state));
+        }
+
+        // Context view switches definitions and processing track markers
+        let currentView = 'dump'; let isFilterMode = false;
+        let activeBoardId = null; let activeTriageItemId = null;
+
+        // Double Click Node Creation Engine: Listens to empty backdrop space updates and generates contextual elements inline
+        window.handleCanvasDoubleClick = function(e, mode) {
+            if (isFilterMode) return; // Prevent node creation when triage filter sorting mechanics are active
+            if (e.target.id !== 'dump-canvas' && e.target.id !== 'board-sandbox') return; // Enforce click safety boundaries
+            
+            const rect = e.currentTarget.getBoundingClientRect();
+            const canvasWrapper = mode === 'dump' ? document.getElementById('view-dump') : document.getElementById('board-sandbox-container');
+            
+            // Accurately capture actual clicked absolute grid map dimensions relative to canvas container positioning
+            const clickX = e.clientX - rect.left + canvasWrapper.scrollLeft; 
+            const clickY = e.clientY - rect.top + canvasWrapper.scrollTop;
+
+            // Generate an ephemeral dynamic textarea editing input box inline
+            const input = document.createElement('div');
+            input.contentEditable = true;
+            input.className = "absolute p-2 min-w-[150px] max-w-[280px] bg-white border border-amber-600/30 rounded shadow-md text-sm outline-hidden font-light z-50 text-zinc-900";
+            input.style.left = `${clickX}px`; input.style.top = `${clickY}px`;
+
+            e.currentTarget.appendChild(input);
+            setTimeout(() => input.focus(), 10); // Automatically shift application mouse focus directly inside the new dynamic editor input wrapper
+
+            // Commit dynamic content changes safely directly back into application data tracking arrays
+            const commitText = () => {
+                const text = input.textContent.trim();
+                if (text) {
+                    if (mode === 'dump') {
+                        state.dumpItems.push({ id: 'item_' + Date.now(), text: text, x: clickX, y: clickY });
+                        saveState(); renderDumpItems();
+                    } else if (mode === 'board') {
+                        const board = state.boards.find(b => b.id === activeBoardId);
+                        board.elements.push({ id: 'el_' + Date.now(), type: 'text', content: text, x: clickX, y: clickY, location: 'canvas' });
+                        saveState(); renderBoardSandbox();
+                    }
+                }
+                input.remove(); // Dispose of temporary DOM input node cleanly from DOM tracking
+            };
+            
+            input.ondblclick = (ev) => ev.stopPropagation(); // Avoid generating sub nested components inside inputs on accidental multi triple-clicks
+            input.onblur = commitText; // Automatically commit data state if user hits enter or shifts window focus patterns away
+            input.onkeydown = (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); input.blur(); } };
+        };
+
+        // Interactive dynamic text title renamer engine handling board dashboard operations
+        window.startRenameBoard = function(e) {
+            e.stopPropagation();
+            const titleEl = document.getElementById('active-board-title');
+            const currentName = titleEl.textContent;
+            const input = document.createElement('input');
+            input.type = 'text'; input.value = currentName;
+            input.className = "bg-zinc-100 text-zinc-900 border border-zinc-300 rounded px-2 py-0.5 text-base font-semibold font-serif outline-hidden";
+            titleEl.replaceWith(input); input.focus(); input.select();
+
+            const saveRename = () => {
+                const newName = input.value.trim();
+                const board = state.boards.find(b => b.id === activeBoardId);
+                if (newName && board) { board.name = newName; saveState(); }
+                input.replaceWith(titleEl); titleEl.textContent = board ? board.name : currentName;
+            };
+            input.onblur = saveRename;
+            input.onkeydown = (ev) => { if (ev.key === 'Enter') saveRename(); if (ev.key === 'Escape') input.replaceWith(titleEl); };
+        };
+
+        // Core Application Canvas Freeform Drag Engine: Hooks low level pointer down updates into item coordinate array transformations
+        function attachDragMechanics(domElement, dataObject, onSaveCallback) {
+            let isDragging = false; let startX, startY, initialLeft, initialTop;
+            domElement.addEventListener('mousedown', (e) => {
+                if (isFilterMode && currentView === 'dump') return; // Cancel dragging if system triage sort logic operations are toggled
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || e.target.hasAttribute('max')) return; // Allow interaction overlays
+                
+                e.stopPropagation(); isDragging = true;
+                startX = e.clientX; startY = e.clientY;
+                initialLeft = domElement.offsetLeft; initialTop = domElement.offsetTop;
+
+                // Watch mouse position tracking during active item displacement configurations
+                const handleMouseMove = (moveEvent) => {
+                    if (!isDragging) return;
+                    let nextX = initialLeft + (moveEvent.clientX - startX);
+                    let nextY = initialTop + (moveEvent.clientY - startY);
+                    domElement.style.left = `${nextX}px`; domElement.style.top = `${nextY}px`;
+                    dataObject.x = nextX; dataObject.y = nextY; // Track coordinates directly back on core storage engine structures
+                };
+                
+                // Clear tracking listeners safely when mouse releases engagement flags
+                const handleMouseUp = (endEvent) => {
+                    isDragging = false;
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                    onSaveCallback(); // Trigger storage schema refresh mapping operations
+                };
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            });
+        }
+
+        // View Mode Swapping Module routing between the Sandbox and Workspace layers
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('view-dump').classList.add('hidden');
+            document.getElementById('view-boards').classList.add('hidden');
+            document.getElementById('filter-toggle-container').style.display = view === 'dump' ? 'flex' : 'none';
+
+            if (view === 'dump') {
+                document.getElementById('view-dump').classList.remove('hidden');
+                document.getElementById('nav-dump').className = "px-4 py-1.5 rounded-md bg-zinc-700 text-white font-semibold shadow-xs";
+                document.getElementById('nav-boards').className = "px-4 py-1.5 rounded-md text-zinc-400 transition";
+                renderDumpItems();
+            } else {
+                document.getElementById('view-boards').classList.remove('hidden');
+                document.getElementById('nav-boards').className = "px-4 py-1.5 rounded-md bg-zinc-700 text-white font-semibold shadow-xs";
+                document.getElementById('nav-dump').className = "px-4 py-1.5 rounded-md text-zinc-400 transition";
+                renderBoardsDashboard();
+            }
+            closeFilterMenu();
+        }
+
+        // Render pipeline displaying absolute text snippet fragments onto the Daily Dump interface mapping workspace
+        function renderDumpItems() {
+            const canvas = document.getElementById('dump-canvas'); canvas.innerHTML = '';
+            document.getElementById('dump-instruction').style.display = state.dumpItems.length === 0 ? 'flex' : 'none';
+            state.dumpItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "dump-item absolute p-3 w-[280px] bg-white rounded-lg shadow-sm border border-zinc-200/80 text-sm font-light text-zinc-900 cursor-grab active:cursor-grabbing select-none z-20 break-words whitespace-pre-wrap visible";
+                div.style.left = `${item.x}px`; div.style.top = `${item.y}px`; div.textContent = item.text;
+                
+                div.addEventListener('click', (e) => { 
+                    if (isFilterMode) { 
+                        e.stopPropagation(); 
+                        openFilterMenu(item.id, e.clientX, e.clientY); 
+                    } 
+                });
+                
+                attachDragMechanics(div, item, saveState); canvas.appendChild(div);
+            });
+        }
+
+        // Mode switch utility tracking state shifts between basic node creation and target board organization routing lists
+        function toggleFilterMode() {
+            isFilterMode = !isFilterMode;
+            const container = document.getElementById('view-dump');
+            const knob = document.getElementById('toggle-knob'); const bg = document.getElementById('filter-toggle');
+            const label = document.getElementById('toggle-label');
+            if (isFilterMode) {
+                container.classList.add('filter-mode');
+                knob.className = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out translate-x-5";
+                bg.className = "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-emerald-600 transition-colors duration-200 ease-in-out";
+                label.textContent = "Click thought to migrate"; label.className = "text-xs font-semibold text-emerald-400 uppercase tracking-wider";
+            } else {
+                container.classList.remove('filter-mode');
+                knob.className = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out translate-x-0";
+                bg.className = "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-zinc-700 transition-colors duration-200 ease-in-out";
+                label.textContent = "Type Mode"; label.className = "text-xs text-zinc-400 uppercase tracking-wider";
+                closeFilterMenu();
+            }
+        }
+
+        // Contextual modal generation engine mapping targeted board targets to pick routing lists options dynamically
+        function openFilterMenu(itemId, x, y) {
+            activeTriageItemId = itemId;
+            const menu = document.getElementById('filter-menu'); const optionsContainer = document.getElementById('filter-menu-options');
+            optionsContainer.innerHTML = '';
+            state.boards.forEach(board => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left px-2.5 py-1.5 hover:bg-zinc-100 rounded text-zinc-700 font-medium flex items-center justify-between";
+                btn.innerHTML = `<span>${board.name}</span><span class="text-zinc-400">→</span>`;
+                btn.onclick = () => migrateItemToBoard(board.id); optionsContainer.appendChild(btn);
+            });
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = "w-full text-left px-2.5 py-1.5 hover:bg-rose-50 text-rose-600 rounded flex items-center justify-between border-t border-zinc-100 mt-1 pt-1.5";
+            deleteBtn.innerHTML = `<span>Discard Thought</span>`; deleteBtn.onclick = discardItem;
+            optionsContainer.appendChild(deleteBtn);
+            
+            menu.style.left = `${x + window.scrollX}px`; menu.style.top = `${y + window.scrollY}px`; 
+            menu.classList.remove('hidden');
+        }
+
+        function closeFilterMenu() { document.getElementById('filter-menu').classList.add('hidden'); activeTriageItemId = null; }
+
+        // Data array splice manipulation pipeline moving a note directly from Daily Dump to active staging channels
+        function migrateItemToBoard(boardId) {
+            const idx = state.dumpItems.findIndex(i => i.id === activeTriageItemId);
+            const board = state.boards.find(b => b.id === boardId);
+            if (idx > -1 && board) {
+                board.elements.push({ id: 'el_' + Date.now(), type: 'text', content: state.dumpItems[idx].text, location: 'stager' });
+                state.dumpItems.splice(idx, 1); saveState(); renderDumpItems();
+            }
+            closeFilterMenu();
+        }
+
+        function discardItem() {
+            const idx = state.dumpItems.findIndex(i => i.id === activeTriageItemId);
+            if (idx > -1) { state.dumpItems.splice(idx, 1); saveState(); renderDumpItems(); }
+            closeFilterMenu();
+        }
+
+        // Render management pipeline generating primary overview dashboard navigation grid layout profiles
+        function renderBoardsDashboard() {
+            const grid = document.getElementById('boards-grid'); grid.innerHTML = '';
+            state.boards.forEach(board => {
+                const card = document.createElement('div');
+                card.className = "bg-zinc-800 border border-zinc-700/60 rounded-xl p-5 shadow-lg hover:shadow-2xl transition duration-200 cursor-pointer flex flex-col justify-between h-40";
+                card.onclick = () => openBoard(board.id);
+                card.innerHTML = `<div><h3 class="font-semibold text-lg text-amber-100 font-serif truncate">${board.name}</h3><p class="text-xs text-zinc-400 mt-1">${board.elements.length} layout elements loaded</p></div><span class="text-xs self-start text-amber-200 font-medium px-2 py-1 bg-zinc-700 rounded">Enter Workspace Canvas →</span>`;
+                grid.appendChild(card);
+            });
+        }
+
+        function createNewBoard() {
+            const name = prompt("Enter a workflow name for this new board canvas:"); if (!name) return;
+            state.boards.push({ id: 'board_' + Date.now(), name: name, font: 'font-sans', bg: '#faf6ee', texture: 'none', elements: [] });
+            saveState(); renderBoardsDashboard();
+        }
+
+        // Initializes target workspace canvases configuration attributes safely
+        function openBoard(boardId) {
+            activeBoardId = boardId; const board = state.boards.find(b => b.id === boardId);
+            document.getElementById('active-board-view').classList.remove('hidden');
+            document.getElementById('active-board-title').textContent = board.name;
+            document.getElementById('board-font-select').value = board.font;
+            document.getElementById('board-texture-select').value = board.texture || 'none';
+            document.getElementById('board-bg-select').value = board.bg || '#faf6ee';
+            
+            renderBoardSandbox(); // Trigger display rendering pipeline operations targeting items mapping lists
+        }
+
+        function closeActiveBoard() { document.getElementById('active-board-view').classList.add('hidden'); activeBoardId = null; renderBoardsDashboard(); }
+
+        // Core Render Matrix UI Framework: Constructs absolute nodes (Texts, Asset Images, Stickers) on infinite field arrays
+        function renderBoardSandbox() {
+            const sandbox = document.getElementById('board-sandbox'); const stager = document.getElementById('active-board-stager');
+            const sandboxContainer = document.getElementById('board-sandbox-container');
+            const board = state.boards.find(b => b.id === activeBoardId);
+            sandbox.innerHTML = ''; stager.innerHTML = '';
+
+            sandboxContainer.style.backgroundImage = ''; 
+            sandboxContainer.style.backgroundColor = board.bg || '#faf6ee';
+            sandboxContainer.className = `flex-1 relative overflow-auto page-bg-base transition-all duration-200 ${board.font || 'font-sans'} ${board.texture || 'none'} text-zinc-800`;
+
+            board.elements.forEach(el => {
+                const wrap = document.createElement('div');
+                
+                if (el.type === 'image') {
+                    wrap.className = "absolute group p-0 select-none z-25 cursor-grab active:cursor-grabbing flex flex-col items-center visible";
+                    wrap.style.left = `${el.x}px`; wrap.style.top = `${el.y}px`;
+                    let w = el.width || 180;
+                    wrap.innerHTML = `<img src="${el.content}" style="width: ${w}px" class="h-auto rounded-lg shadow-sm pointer-events-none" onerror="this.src='https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=400'"/>
+                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-32 px-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center bg-zinc-900/90 text-white rounded p-1 shadow-lg z-30 mt-1">
+                        <input type="range" min="60" max="500" value="${w}" class="w-full h-1 cursor-pointer accent-amber-400 bg-zinc-700/60 rounded appearance-none" oninput="resizeBoardImage(event, '${el.id}', this.value)"/>
+                    </div>`;
+                    
+                    const del = document.createElement('button'); del.innerHTML = '×'; del.className = "absolute -top-2.5 -right-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold shadow-md cursor-pointer z-50";
+                    del.onclick = (e) => { e.stopPropagation(); removeElementFromBoard(el.id); }; wrap.appendChild(del);
+                    attachDragMechanics(wrap, el, saveState); sandbox.appendChild(wrap);
+                
+                } else if (el.type === 'text') {
+                    if (el.location === 'stager') {
+                        wrap.className = "dump-item bg-white border border-zinc-200 p-3 rounded-md text-sm shadow-xs group cursor-pointer hover:shadow-md transition";
+                        wrap.textContent = el.content;
+                        wrap.onclick = () => migrateStagerItemToCanvas(el.id);
+                        stager.appendChild(wrap);
+                    } else {
+                        wrap.className = "board-element absolute group p-4 bg-white/95 border border-zinc-200/80 rounded-lg w-[280px] text-sm text-zinc-800 shadow-xs cursor-grab active:cursor-grabbing z-30 break-words whitespace-pre-wrap visible";
+                        wrap.style.left = `${el.x}px`; wrap.style.top = `${el.y}px`; wrap.textContent = el.content;
+                        
+                        const del = document.createElement('button'); del.innerHTML = '×'; del.className = "absolute -top-2.5 -right-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold shadow-md cursor-pointer z-50";
+                        del.onclick = (e) => { e.stopPropagation(); removeElementFromBoard(el.id); }; wrap.appendChild(del);
+                        attachDragMechanics(wrap, el, saveState); sandbox.appendChild(wrap);
+                    }
+                } else if (el.type === 'sticker') {
+                    wrap.className = "absolute transform hover:scale-110 transition-transform cursor-grab active:cursor-grabbing p-2 z-30 text-4xl visible";
+                    wrap.style.left = `${el.x}px`; wrap.style.top = `${el.y}px`; wrap.textContent = el.content;
+                    
+                    const del = document.createElement('button'); del.innerHTML = '×'; del.className = "absolute -top-1 -right-1 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold shadow-xs cursor-pointer z-50";
+                    del.onclick = (e) => { e.stopPropagation(); removeElementFromBoard(el.id); }; wrap.appendChild(del);
+                    attachDragMechanics(wrap, el, saveState); sandbox.appendChild(wrap);
+                }
+            });
+        }
+
+        window.resizeBoardImage = function(e, id, newW) {
+            e.stopPropagation(); const board = state.boards.find(b => b.id === activeBoardId);
+            const el = board.elements.find(i => i.id === id);
+            if (el) { el.width = parseInt(newW); saveState(); const img = e.target.closest('.group').querySelector('img'); if (img) img.style.width = `${newW}px`; }
+        };
+
+        function migrateStagerItemToCanvas(elId) {
+            const board = state.boards.find(b => b.id === activeBoardId);
+            const el = board.elements.find(i => i.id === elId);
+            if (el) {
+                el.location = 'canvas';
+                el.x = 60; el.y = 120;
+                saveState(); renderBoardSandbox();
+            }
+        }
+
+        function changeBoardFont(v) { const b = state.boards.find(x => x.id === activeBoardId); b.font = v; saveState(); renderBoardSandbox(); }
+        function changeBoardTexture(v) { const b = state.boards.find(x => x.id === activeBoardId); b.texture = v; saveState(); renderBoardSandbox(); }
+        function changeBoardBg(v) { const b = state.boards.find(x => x.id === activeBoardId); b.bg = v; saveState(); renderBoardSandbox(); }
+
+        function addMediaToBoard(type) {
+            const b = state.boards.find(x => x.id === activeBoardId);
+            if (type === 'image') {
+                let url = prompt("Paste your moodboard asset URL string address:"); if (!url) return;
+                if (url.includes('i.pinimg.com/originals/')) url = url.replace('/originals/', '/736x/'); 
+                b.elements.push({ id: 'el_' + Date.now(), type: 'image', content: url, x: 150, y: 150, width: 180, location: 'canvas' });
+            } else if (type === 'sticker') {
+                let emoji = prompt("Enter an emoji character asset asset:", "🌸"); if (!emoji) return;
+                b.elements.push({ id: 'el_' + Date.now(), type: 'sticker', content: emoji, x: 200, y: 200, location: 'canvas' });
+            }
+            saveState(); renderBoardSandbox();
+        }
+
+        function removeElementFromBoard(id) {
+            const b = state.boards.find(x => x.id === activeBoardId); b.elements = b.elements.filter(i => i.id !== id);
+            saveState(); renderBoardSandbox();
+        }
+
+        // LOCAL LINK-BASED DEVICE BACKUP SYNC CORES
+        function copySyncLink() {
+            // Pack current browser active memory layout values into a safe string transfer format
+            const compressedData = btoa(encodeURIComponent(JSON.stringify(state)));
+            const syncUrl = `${window.location.origin}${window.location.pathname}?sync=${compressedData}`;
+            
+            navigator.clipboard.writeText(syncUrl).then(() => {
+                alert("Sync link successfully copied to your clipboard! Text or email it to your laptop to transfer your train thoughts.");
+            }).catch(err => {
+                alert("Could not write link automatically. Copy this layout link string manually instead:\n\n" + syncUrl);
+            });
+        }
+
+        function checkForIncomingSync() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const syncData = urlParams.get('sync');
+            
+            if (syncData) {
+                try {
+                    // Extract payload arrays safely out of URL strings parameter
+                    const decodedState = JSON.parse(decodeURIComponent(atob(syncData)));
+                    
+                    if (decodedState.dumpItems || decodedState.boards) {
+                        if (confirm("Found an incoming data sandbox sync link from your phone session! Do you want to overwrite this machine's local canvas and import it now?")) {
+                            state = decodedState;
+                            saveState(); // Safely anchor updates into this browser instance memory structures
+                            
+                            // Wipe parameters clean out of browser bars histories layout strings
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Critical parse block tracking imported parameters failure configurations:", e);
+                }
+            }
+            renderDumpItems();
+        }
+
+        // Kickstart basic systems display mappings routines profiles directly on browser initialization execution steps
+        checkForIncomingSync();
+    </script>
+</body>
+</html>
