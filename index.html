@@ -74,15 +74,12 @@
         </div>
 
         <div class="flex items-center space-x-4">
-            <div id="filter-toggle-container" class="flex items-center space-x-3 border-r border-zinc-800 pr-4">
+            <div id="filter-toggle-container" class="flex items-center space-x-3">
                 <span class="text-xs text-zinc-400 uppercase tracking-wider" id="toggle-label">Type Mode</span>
                 <button id="filter-toggle" onclick="toggleFilterMode()" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-zinc-700 transition-colors duration-200 ease-in-out">
                     <span id="toggle-knob" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white transition duration-200 ease-in-out translate-x-0"></span>
                 </button>
             </div>
-            <button onclick="copySyncLink()" class="bg-amber-100 text-zinc-900 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs hover:bg-amber-200 transition">
-                🔗 Copy Link to Laptop
-            </button>
         </div>
     </header>
 
@@ -494,19 +491,6 @@
         function removeElementFromBoard(id) {
             const b = state.boards.find(x => x.id === activeBoardId); b.elements = b.elements.filter(i => i.id !== id);
             saveState(); renderBoardSandbox();
-        }
-
-        // LOCAL LINK-BASED DEVICE BACKUP SYNC CORES
-        function copySyncLink() {
-            // Pack current browser active memory layout values into a safe string transfer format
-            const compressedData = btoa(encodeURIComponent(JSON.stringify(state)));
-            const syncUrl = `${window.location.origin}${window.location.pathname}?sync=${compressedData}`;
-            
-            navigator.clipboard.writeText(syncUrl).then(() => {
-                alert("Sync link successfully copied to your clipboard! Text or email it to your laptop to transfer your train thoughts.");
-            }).catch(err => {
-                alert("Could not write link automatically. Copy this layout link string manually instead:\n\n" + syncUrl);
-            });
         }
 
         function checkForIncomingSync() {
