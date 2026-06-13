@@ -40,7 +40,7 @@
             background-color: rgba(211, 203, 182, 0.1);
         }
 
-        /* Visual highlighting for sorting mode (Triage Mode) inside the Daily Dump */
+        /* Visual highlighting for sorting mode (Triage Mode) inside the Scratchpad */
         .filter-mode .dump-item {
             border: 2px solid #a3b899 !important; /* Muted soft green border line */
             box-shadow: 0 4px 12px rgba(163, 184, 153, 0.2); cursor: pointer !important;
@@ -68,7 +68,7 @@
         <div class="flex items-center space-x-6">
             <h1 class="text-xl font-bold tracking-wider font-serif text-amber-100">palace.</h1>
             <nav class="flex space-x-1 bg-zinc-800 p-1 rounded-lg text-sm font-medium">
-                <button id="nav-dump" onclick="switchView('dump')" class="px-4 py-1.5 rounded-md bg-zinc-700 text-white shadow-xs transition">Daily Dump</button>
+                <button id="nav-dump" onclick="switchView('dump')" class="px-4 py-1.5 rounded-md bg-zinc-700 text-white shadow-xs transition">Scratchpad</button>
                 <button id="nav-boards" onclick="switchView('boards')" class="px-4 py-1.5 rounded-md text-zinc-400 hover:text-white transition">My Boards</button>
             </nav>
         </div>
@@ -292,7 +292,7 @@
             closeFilterMenu();
         }
 
-        // Render pipeline displaying absolute text snippet fragments onto the Daily Dump interface mapping workspace
+        // Render pipeline displaying absolute text snippet fragments onto the Scratchpad interface mapping workspace
         function renderDumpItems() {
             const canvas = document.getElementById('dump-canvas'); canvas.innerHTML = '';
             document.getElementById('dump-instruction').style.display = state.dumpItems.length === 0 ? 'flex' : 'none';
@@ -354,7 +354,7 @@
 
         function closeFilterMenu() { document.getElementById('filter-menu').classList.add('hidden'); activeTriageItemId = null; }
 
-        // Data array splice manipulation pipeline moving a note directly from Daily Dump to active staging channels
+        // Data array splice manipulation pipeline moving a note directly from Scratchpad to active staging channels
         function migrateItemToBoard(boardId) {
             const idx = state.dumpItems.findIndex(i => i.id === activeTriageItemId);
             const board = state.boards.find(b => b.id === boardId);
